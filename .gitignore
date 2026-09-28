@@ -104,3 +104,8 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Imported Asset
+## AngeloMaN87 - Prototype Map(https://assetstore.unity.com/packages/package/315588)
+/[Aa]ssets/AngeloMaN87/
+/[Aa]ssets/AngeloMaN87.meta
