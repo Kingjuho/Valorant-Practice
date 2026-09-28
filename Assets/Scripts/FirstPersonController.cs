@@ -31,16 +31,26 @@ namespace ValorantPractice
         [Tooltip("Prototype gravity; not a measured VALORANT value.")]
         [SerializeField, Min(0f)] private float gravity = 20f;
 
+        [Header("Acceleration / braking (prototype estimates)")]
+        [Tooltip("Seconds from rest to the equipped profile's maximum speed.")]
+        [SerializeField, Min(0.001f)] private float accelerationTime = 0.29f;
+        [Tooltip("Seconds from full gun speed to rest after releasing movement.")]
+        [SerializeField, Min(0.001f)] private float gunStopTime = 0.125f;
+        [Tooltip("Seconds from full knife speed to rest after releasing movement.")]
+        [SerializeField, Min(0.001f)] private float knifeStopTime = 0.145f;
+
         private CharacterController controller;
         private InputAction moveAction;
         private InputAction lookAction;
         private float yaw;
         private float pitch;
         private float verticalSpeed;
+        private Vector3 horizontalVelocity;
         private bool hasFocus = true;
         private bool hasCapturedCursor;
 
         public float MoveSpeed => equipment == MovementEquipment.Knife ? knifeSpeed : gunSpeed;
+        public float HorizontalSpeed => horizontalVelocity.magnitude;
 
         private void Awake()
         {
@@ -95,7 +105,10 @@ namespace ValorantPractice
         private void Update()
         {
             if (!hasFocus || !controller.enabled || Time.timeScale == 0f)
+            {
+                ResetMotion();
                 return;
+            }
 
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
@@ -106,6 +119,7 @@ namespace ValorantPractice
 
             if (!hasCapturedCursor || Cursor.lockState != CursorLockMode.Locked)
             {
+                ResetMotion();
                 hasCapturedCursor = false;
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
                 {
@@ -134,25 +148,49 @@ namespace ValorantPractice
             cameraPivot.localRotation = Quaternion.Euler(pitch, 0f, 0f);
 
             Vector2 input = Vector2.ClampMagnitude(moveAction.ReadValue<Vector2>(), 1f);
-            Vector3 velocity = (transform.right * input.x + transform.forward * input.y) * MoveSpeed;
+            Vector3 targetVelocity = (transform.right * input.x + transform.forward * input.y) * MoveSpeed;
+            float stopTime = equipment == MovementEquipment.Knife ? knifeStopTime : gunStopTime;
+            Vector3 displacement = PlanarMovement.Step(ref horizontalVelocity, targetVelocity,
+                MoveSpeed / Mathf.Max(accelerationTime, 0.001f),
+                MoveSpeed / Mathf.Max(stopTime, 0.001f), Time.deltaTime);
             if (controller.isGrounded && verticalSpeed < 0f)
                 verticalSpeed = -2f;
 
             verticalSpeed -= gravity * Time.deltaTime;
-            velocity.y = verticalSpeed;
-            CollisionFlags collisions = controller.Move(velocity * Time.deltaTime);
+            displacement.y = verticalSpeed * Time.deltaTime;
+            CollisionFlags collisions = controller.Move(displacement);
             if ((collisions & CollisionFlags.Below) != 0 && verticalSpeed < 0f)
                 verticalSpeed = -2f;
         }
 
         private void ReleaseCursor()
         {
+            ResetMotion();
             if (!hasCapturedCursor)
                 return;
 
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
             hasCapturedCursor = false;
+        }
+
+        private void ResetMotion()
+        {
+            horizontalVelocity = Vector3.zero;
+            verticalSpeed = 0f;
+        }
+
+        private void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            // Walkable ground should not cancel planar motion. Walls and steep
+            // slopes remove blocked momentum so it is not stored behind a wall.
+            if (hit.normal.y >= Mathf.Cos(controller.slopeLimit * Mathf.Deg2Rad))
+                return;
+
+            Vector3 normal = new Vector3(hit.normal.x, 0f, hit.normal.z).normalized;
+            float intoSurface = Vector3.Dot(horizontalVelocity, normal);
+            if (intoSurface < 0f)
+                horizontalVelocity -= normal * intoSurface;
         }
     }
 }

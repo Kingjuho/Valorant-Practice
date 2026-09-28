@@ -26,9 +26,29 @@ ADS and scoped sensitivity multipliers are not implemented.
 One Unity unit represents one metre. Diagonal movement is normalized.
 The existing camera FOV and initial eye height are preserved.
 
-This prototype uses immediate acceleration/stopping. Braking, walk/crouch,
-jumping and shooting are not implemented yet. Gravity and capsule dimensions
-are prototype settings, not verified VALORANT physics values.
+Movement uses a linear acceleration/braking approximation, adjustable on Player:
+
+| Inspector setting | Default | Meaning |
+| --- | --- | --- |
+| Acceleration Time | 0.29 s | Rest to full speed, for both profiles |
+| Gun Stop Time | 0.125 s | Full gun speed to rest |
+| Knife Stop Time | 0.145 s | Full knife speed to rest |
+
+Lower starting speeds stop sooner with the same deceleration rate. Opposing
+input brakes to zero first, then accelerates in the new direction using any
+time left in that frame. There is no additional counter-strafe braking bonus.
+Perpendicular direction changes approach the new velocity at the acceleration
+rate. Switching speed profiles also approaches the new speed gradually.
+Cursor release, focus loss and disabling controls clear stored momentum.
+
+Both velocity and displacement are integrated over each ramp, including frames
+that cross a stop or reach full speed. These provisional targets come from a
+2022 community measurement, not verified current VALORANT engine constants:
+https://docs.google.com/document/u/2/d/e/2PACX-1vTsGYzGYiO78fcr_frhhBmzDaMvEqgBRd3b5u7TNzXRAhKflvFOovleWmavebIfFywh3DHppT75xHAk/pub
+
+Walk/crouch, jumping and shooting are not implemented yet. Gravity and capsule
+dimensions are also prototype settings. Stopping times here describe movement,
+not the separate threshold at which shooting loses its movement penalty.
 
 Movement references:
 - https://liquipedia.net/valorant/Vandal
